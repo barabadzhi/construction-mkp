@@ -1,0 +1,23 @@
+[package]
+name = "mkp"
+version = "0.1.0"
+authors = ["Bogdan Arabadzhi <bogdan.today@gmail.com>"]
+
+[dependencies]
+clap = "2.29.2"
+colored = "1.6.0"
+rand = "0.4.2"
+rayon = "0.9.0"
+
+[profile.dev]
+opt-level = 0
+lto = false
+debug-assertions = true
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = false
+debug-assertions = false
+panic = "abort"
