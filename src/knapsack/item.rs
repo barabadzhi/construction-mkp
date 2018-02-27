@@ -3,9 +3,9 @@ use std::cmp::Ordering;
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Item {
     pub id: usize,
-    pub profit: u16,
-    pub weights: Box<[u16]>,
-    pub weighted_profit: f32,
+    pub profit: u32,
+    pub weights: Box<[u32]>,
+    pub weighted_profit: f64,
 }
 
 impl Ord for Item {

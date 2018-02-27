@@ -20,7 +20,7 @@ pub struct Knapsack {
     m: usize,
     n: usize,
     items: Vec<Item>,
-    capacity: Box<[u16]>,
+    capacity: Box<[u32]>,
 }
 
 impl Knapsack {
@@ -41,10 +41,10 @@ impl Knapsack {
         let mut knapsack = Knapsack::new();
 
         for (line_number, contents) in reader.lines().enumerate() {
-            let mut contents: Vec<u16> = contents
+            let mut contents: Vec<u32> = contents
                 .unwrap()
                 .split_whitespace()
-                .map(|x| x.parse::<u16>().unwrap())
+                .map(|x| x.parse::<u32>().unwrap())
                 .collect();
 
             match line_number {
@@ -82,7 +82,7 @@ impl Knapsack {
                 item_weights.push(weight[index]);
             }
 
-            let weighted_profit = f32::from(profit) / f32::from(item_weights.iter().sum::<u16>());
+            let weighted_profit = f64::from(profit) / f64::from(item_weights.iter().sum::<u32>());
 
             knapsack.items.push(Item {
                 id: index + 1,
@@ -132,7 +132,7 @@ impl Knapsack {
         for (left, total) in capacity_left.iter().zip(self.capacity.iter()) {
             result.utilization.push(format!(
                 "{:.2}%",
-                ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
+                ((f64::from(*total - *left) / f64::from(*total)) * 100_f64)
             ))
         }
 
@@ -183,7 +183,7 @@ impl Knapsack {
                 for (left, total) in capacity_left.iter().zip(self.capacity.iter()) {
                     internal_result.utilization.push(format!(
                         "{:.2}%",
-                        ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
+                        ((f64::from(*total - *left) / f64::from(*total)) * 100_f64)
                     ))
                 }
 
