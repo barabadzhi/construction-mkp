@@ -1,40 +1,32 @@
-extern crate colored;
-
 pub mod item;
+pub mod statistics;
 
-use std::fmt;
 use std::fs::File;
-use std::time::Duration;
 use std::io::{BufRead, BufReader};
-
-use self::colored::*;
+use std::time::Instant;
 
 use self::item::Item;
+use self::statistics::Statistics;
 
-#[derive(Clone, Default)]
+#[derive(Default, Debug)]
 pub struct Knapsack {
-    pub n: usize,
-    pub m: usize,
-    pub items: Vec<Item>,
-    pub capacity: Box<[u16]>,
-    pub heuristic: String,
-    pub statistics: Statistics,
-}
-
-#[derive(Clone, Default, Debug)]
-pub struct Statistics {
-    pub total_profit: u32,
-    pub duration: Duration,
+    m: usize,
+    n: usize,
+    items: Vec<Item>,
+    total_capacity: Box<[u16]>,
+    capacity_left: Box<[u16]>,
+    pub greedy_result: Statistics,
+    pub random_results: Box<[Statistics]>,
 }
 
 impl Knapsack {
-    fn new() -> Self {
-        Self {
+    fn new() -> Knapsack {
+        Knapsack {
             ..Default::default()
         }
     }
 
-    pub fn from(file: &str) -> Self {
+    pub fn from(file: &str) -> Knapsack {
         let file = File::open(file).expect("Input file is not specified");
         let reader = BufReader::new(file);
 
@@ -74,7 +66,8 @@ impl Knapsack {
                 _ => {
                     // a line with rhs of <= constraints
                     debug_assert_eq!(contents.len(), knapsack.m);
-                    knapsack.capacity = contents.into_boxed_slice();
+                    knapsack.total_capacity = contents.clone().into_boxed_slice();
+                    knapsack.capacity_left = contents.into_boxed_slice();
                 }
             }
         }
@@ -86,107 +79,53 @@ impl Knapsack {
                 item_weights.push(weight[index]);
             }
 
+            let weighted_profit = f32::from(profit) / f32::from(item_weights.iter().sum::<u16>());
+
             knapsack.items.push(Item {
-                profit: profit,
-                weights: item_weights.into_boxed_slice(),
-                used: false,
                 id: index + 1,
+                profit,
+                weights: item_weights.into_boxed_slice(),
+                weighted_profit,
             });
         }
 
         knapsack
     }
 
-    pub fn heuristic(mut self, name: &str) -> Self {
-        self.heuristic = name.into();
-        self
-    }
-}
+    pub fn run_greedy(&mut self) {
+        let time = Instant::now();
 
-impl fmt::Debug for Knapsack {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut items = String::new();
+        self.items.sort_unstable_by(|a, b| b.cmp(a));
+
+        let mut item_can_be_used = false;
 
         for item in &self.items {
-            items += &format!("\t{:?}\n", item);
-        }
+            for (index, constraint) in self.capacity_left.iter().enumerate() {
+                if item.weights[index] > *constraint {
+                    item_can_be_used = false;
+                    break;
+                } else {
+                    item_can_be_used = true
+                };
+            }
 
-        items.trim_right_matches('\n');
+            if item_can_be_used {
+                for (index, constraint) in self.capacity_left.iter_mut().enumerate() {
+                    *constraint -= item.weights[index];
+                }
 
-        write!(
-            f,
-            r#"Knapsack {{
-    heuristic: {},
-    n: {},
-    m: {},
-    items:
-    {},
-    capacity: {:?},
-    stistics: {:?}
-}}"#,
-            self.heuristic, self.n, self.m, items, self.capacity, self.statistics
-        )
-    }
-}
-
-impl fmt::Display for Knapsack {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut items = Vec::new();
-
-        for item in &self.items {
-            if item.used {
-                items.push(item.id);
+                self.greedy_result.picked_items.push(item.id.to_string());
+                self.greedy_result.total_profit += u32::from(item.profit);
             }
         }
 
-        items.sort();
-
-        let mut list_of_items = String::new();
-
-        for item in &items {
-            list_of_items += &format!("{:?}, ", item);
+        for (left, total) in self.capacity_left.iter().zip(self.total_capacity.iter()) {
+            self.greedy_result.utilization.push(format!(
+                "{:.2}%",
+                ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
+            ))
         }
 
-        list_of_items.trim_right_matches(", ");
-
-        let mut run_time = String::new();
-
-        if self.statistics.duration.as_secs() > 0 {
-            run_time += &format!(
-                "{} {}",
-                self.statistics.duration.as_secs().to_string().green(),
-                's'
-            );
-        }
-
-        if self.statistics.duration.subsec_nanos() > 0 {
-            if run_time.is_empty() {
-                run_time += &format!(
-                    "{} {}",
-                    self.statistics.duration.subsec_nanos().to_string().green(),
-                    "ns"
-                )
-            } else {
-                run_time += &format!(
-                    " {} {}",
-                    self.statistics.duration.subsec_nanos().to_string().green(),
-                    "ns"
-                )
-            }
-        }
-
-        write!(
-            f,
-            r#"{}
-    -> Total profit: {}
-    -> Items ({}): {}
-    -> Duration: {}
-"#,
-            self.heuristic.cyan().bold(),
-            self.statistics.total_profit.to_string().green(),
-            items.len(),
-            list_of_items.yellow(),
-            run_time
-        )
+        self.greedy_result.duration = time.elapsed();
     }
 }

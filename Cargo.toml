@@ -4,10 +4,10 @@ version = "0.1.0"
 authors = ["Bogdan Arabadzhi <bogdan.today@gmail.com>"]
 
 [dependencies]
-clap = "2.29.2"
+clap = "2.30.0"
 colored = "1.6.0"
 rand = "0.4.2"
-rayon = "0.9.0"
+rayon = "1.0.0"
 
 [profile.dev]
 opt-level = 0
