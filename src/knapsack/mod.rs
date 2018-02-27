@@ -125,19 +125,21 @@ impl Knapsack {
             }
         }
 
+        self.greedy_result.duration = time.elapsed();
+        self.greedy_result.runs = 1;
+
         for (left, total) in self.capacity_left.iter().zip(self.total_capacity.iter()) {
             self.greedy_result.utilization.push(format!(
                 "{:.2}%",
                 ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
             ))
         }
-
-        self.greedy_result.duration = time.elapsed();
-        self.greedy_result.runs = 1;
     }
 
     pub fn run_random(&mut self, runs: usize) {
         let mut knapsacks = Vec::new();
+
+        self.capacity_left = self.total_capacity.clone();
 
         for _ in 0..runs {
             let mut k = self.clone();
@@ -152,8 +154,8 @@ impl Knapsack {
         knapsacks.par_iter_mut().for_each(|knapsack| {
             let mut item_can_be_used = false;
 
-            for item in &mut knapsack.items {
-                for (index, constraint) in knapsack.total_capacity.iter().enumerate() {
+            for item in &knapsack.items {
+                for (index, constraint) in knapsack.capacity_left.iter().enumerate() {
                     if item.weights[index] > *constraint {
                         item_can_be_used = false;
                         break;
@@ -163,7 +165,7 @@ impl Knapsack {
                 }
 
                 if item_can_be_used {
-                    for (index, constraint) in knapsack.total_capacity.iter_mut().enumerate() {
+                    for (index, constraint) in knapsack.capacity_left.iter_mut().enumerate() {
                         *constraint -= item.weights[index];
                     }
 
@@ -189,5 +191,14 @@ impl Knapsack {
         self.random_result = knapsacks[best_profid_index].random_result.clone();
         self.random_result.duration = time.elapsed();
         self.random_result.runs = runs;
+
+        self.capacity_left = knapsacks[best_profid_index].capacity_left.clone();
+
+        for (left, total) in self.capacity_left.iter().zip(self.total_capacity.iter()) {
+            self.random_result.utilization.push(format!(
+                "{:.2}%",
+                ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
+            ))
+        }
     }
 }
