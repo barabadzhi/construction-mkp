@@ -10,18 +10,17 @@ use self::rayon::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
+use std::sync::RwLock;
 
 use self::item::Item;
 use self::statistics::Statistics;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub struct Knapsack {
     m: usize,
     n: usize,
     items: Vec<Item>,
     capacity: Box<[u16]>,
-    pub greedy_result: Statistics,
-    pub random_result: Statistics,
 }
 
 impl Knapsack {
@@ -96,16 +95,18 @@ impl Knapsack {
         knapsack
     }
 
-    pub fn run_greedy(&mut self) {
+    pub fn run_greedy(&self) -> Statistics {
+        let mut items = self.items.clone();
         let mut capacity_left = self.capacity.clone();
+        let mut result = Statistics::new();
 
         let time = Instant::now();
 
-        self.items.sort_unstable_by(|a, b| b.cmp(a));
+        items.sort_unstable_by(|a, b| b.cmp(a));
 
         let mut item_can_be_used = false;
 
-        for item in &self.items {
+        for item in &items {
             for (index, constraint) in capacity_left.iter().enumerate() {
                 if item.weights[index] > *constraint {
                     item_can_be_used = false;
@@ -120,43 +121,45 @@ impl Knapsack {
                     *constraint -= item.weights[index];
                 }
 
-                self.greedy_result.picked_items.push(item.id.to_string());
-                self.greedy_result.total_profit += u32::from(item.profit);
+                result.picked_items.push(item.id.to_string());
+                result.total_profit += u32::from(item.profit);
             }
         }
 
-        self.greedy_result.duration = time.elapsed();
-        self.greedy_result.runs = 1;
+        result.duration = time.elapsed();
+        result.runs = 1;
 
         for (left, total) in capacity_left.iter().zip(self.capacity.iter()) {
-            self.greedy_result.utilization.push(format!(
+            result.utilization.push(format!(
                 "{:.2}%",
                 ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
             ))
         }
+
+        result
     }
 
-    pub fn run_random(&mut self, runs: usize) {
-        let mut knapsacks = Vec::new();
+    pub fn run_random(&self, runs: usize) -> Statistics {
+        let mut instances = Vec::with_capacity(runs);
+        let mut indexes: Vec<usize> = (0..self.items.len()).collect();
+        let result = RwLock::new(Statistics::new());
 
         let time = Instant::now();
 
         for _ in 0..runs {
-            let mut k = self.clone();
-            thread_rng().shuffle(&mut k.items);
-            knapsacks.push(k);
+            thread_rng().shuffle(&mut indexes);
+            instances.push(indexes.to_vec());
         }
 
-        debug_assert_eq!(knapsacks.len(), runs);
-
-        knapsacks.par_iter_mut().for_each(|knapsack| {
+        instances.par_iter().for_each(|instance| {
             let mut capacity_left = self.capacity.clone();
+            let mut internal_result = Statistics::new();
 
-            let mut item_can_be_used = false;
+            for index in instance {
+                let mut item_can_be_used = false;
 
-            for item in &knapsack.items {
-                for (index, constraint) in capacity_left.iter().enumerate() {
-                    if item.weights[index] > *constraint {
+                for (constraint_index, constraint) in capacity_left.iter().enumerate() {
+                    if self.items[*index].weights[constraint_index] > *constraint {
                         item_can_be_used = false;
                         break;
                     } else {
@@ -165,44 +168,34 @@ impl Knapsack {
                 }
 
                 if item_can_be_used {
-                    for (index, constraint) in capacity_left.iter_mut().enumerate() {
-                        *constraint -= item.weights[index];
+                    for (constraint_index, constraint) in capacity_left.iter_mut().enumerate() {
+                        *constraint -= self.items[*index].weights[constraint_index];
                     }
 
-                    knapsack
-                        .random_result
+                    internal_result
                         .picked_items
-                        .push(item.id.to_string());
-                    knapsack.random_result.total_profit += u32::from(item.profit);
+                        .push(self.items[*index].id.to_string());
+                    internal_result.total_profit += u32::from(self.items[*index].profit);
                 }
             }
 
-            knapsack.capacity = capacity_left;
+            if internal_result.total_profit > result.read().unwrap().total_profit {
+                for (left, total) in capacity_left.iter().zip(self.capacity.iter()) {
+                    internal_result.utilization.push(format!(
+                        "{:.2}%",
+                        ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
+                    ))
+                }
+
+                *result.write().unwrap() = internal_result.clone();
+            }
         });
 
-        let mut best_profid_index = 0;
+        let mut result = result.into_inner().unwrap();
 
-        for (index, knapsack) in &mut knapsacks.iter().enumerate() {
-            if knapsack.random_result.total_profit
-                > knapsacks[best_profid_index].random_result.total_profit
-            {
-                best_profid_index = index;
-            }
-        }
+        result.duration = time.elapsed();
+        result.runs = runs;
 
-        self.random_result = knapsacks[best_profid_index].random_result.clone();
-        self.random_result.duration = time.elapsed();
-        self.random_result.runs = runs;
-
-        for (left, total) in knapsacks[best_profid_index]
-            .capacity
-            .iter()
-            .zip(self.capacity.iter())
-        {
-            self.random_result.utilization.push(format!(
-                "{:.2}%",
-                ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
-            ))
-        }
+        result
     }
 }

@@ -11,13 +11,13 @@ use knapsack::Knapsack;
 fn main() {
     let (file, n_times) = read_cmd_arguments();
 
-    let mut knapsack = Knapsack::from(&file);
+    let knapsack = Knapsack::from(&file);
 
-    knapsack.run_greedy();
-    println!("{}{}", "Greedy".cyan().bold(), knapsack.greedy_result);
+    let greedy_result = knapsack.run_greedy();
+    println!("{}{}", "Greedy".cyan().bold(), greedy_result);
 
-    knapsack.run_random(n_times);
-    println!("{}{}", "Random".cyan().bold(), knapsack.random_result);
+    let random_result = knapsack.run_random(n_times);
+    println!("{}{}", "Random".cyan().bold(), random_result);
 }
 
 fn read_cmd_arguments() -> (String, usize) {

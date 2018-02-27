@@ -12,6 +12,14 @@ pub struct Statistics {
     pub duration: Duration,
 }
 
+impl Statistics {
+    pub fn new() -> Statistics {
+        Statistics {
+            ..Default::default()
+        }
+    }
+}
+
 impl fmt::Display for Statistics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut run_time = String::new();
