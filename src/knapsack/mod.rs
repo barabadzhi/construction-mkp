@@ -1,5 +1,11 @@
+extern crate rand;
+extern crate rayon;
+
 pub mod item;
 pub mod statistics;
+
+use self::rand::{thread_rng, Rng};
+use self::rayon::prelude::*;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -8,7 +14,7 @@ use std::time::Instant;
 use self::item::Item;
 use self::statistics::Statistics;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Knapsack {
     m: usize,
     n: usize,
@@ -16,7 +22,7 @@ pub struct Knapsack {
     total_capacity: Box<[u16]>,
     capacity_left: Box<[u16]>,
     pub greedy_result: Statistics,
-    pub random_results: Box<[Statistics]>,
+    pub random_result: Statistics,
 }
 
 impl Knapsack {
@@ -127,5 +133,61 @@ impl Knapsack {
         }
 
         self.greedy_result.duration = time.elapsed();
+        self.greedy_result.runs = 1;
+    }
+
+    pub fn run_random(&mut self, runs: usize) {
+        let mut knapsacks = Vec::new();
+
+        for _ in 0..runs {
+            let mut k = self.clone();
+            thread_rng().shuffle(&mut k.items);
+            knapsacks.push(k);
+        }
+
+        debug_assert_eq!(knapsacks.len(), runs);
+
+        let time = Instant::now();
+
+        knapsacks.par_iter_mut().for_each(|knapsack| {
+            let mut item_can_be_used = false;
+
+            for item in &mut knapsack.items {
+                for (index, constraint) in knapsack.total_capacity.iter().enumerate() {
+                    if item.weights[index] > *constraint {
+                        item_can_be_used = false;
+                        break;
+                    } else {
+                        item_can_be_used = true;
+                    }
+                }
+
+                if item_can_be_used {
+                    for (index, constraint) in knapsack.total_capacity.iter_mut().enumerate() {
+                        *constraint -= item.weights[index];
+                    }
+
+                    knapsack
+                        .random_result
+                        .picked_items
+                        .push(item.id.to_string());
+                    knapsack.random_result.total_profit += u32::from(item.profit);
+                }
+            }
+        });
+
+        let mut best_profid_index = 0;
+
+        for (index, knapsack) in &mut knapsacks.iter().enumerate() {
+            if knapsack.random_result.total_profit
+                > knapsacks[best_profid_index].random_result.total_profit
+            {
+                best_profid_index = index;
+            }
+        }
+
+        self.random_result = knapsacks[best_profid_index].random_result.clone();
+        self.random_result.duration = time.elapsed();
+        self.random_result.runs = runs;
     }
 }

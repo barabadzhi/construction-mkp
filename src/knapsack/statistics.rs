@@ -3,11 +3,12 @@ use std::time::Duration;
 
 use colored::*;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Statistics {
     pub total_profit: u32,
     pub picked_items: Vec<String>,
     pub utilization: Vec<String>,
+    pub runs: usize,
     pub duration: Duration,
 }
 
@@ -39,14 +40,16 @@ impl fmt::Display for Statistics {
             f,
             r#"
     -> Total profit: {}
-    -> Items ({}): {}
-    -> Utilization: {}    
+    -> Picked items ({}): {}
+    -> Utilization: {}
+    -> Runs: {}
     -> Duration: {}
 "#,
             self.total_profit.to_string().green(),
             self.picked_items.len(),
-            &self.picked_items.join(", ").yellow(),
+            self.picked_items.join(", ").yellow(),
             self.utilization.join(" ").blue(),
+            self.runs.to_string().cyan(),
             run_time
         )
     }
