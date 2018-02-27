@@ -19,8 +19,7 @@ pub struct Knapsack {
     m: usize,
     n: usize,
     items: Vec<Item>,
-    total_capacity: Box<[u16]>,
-    capacity_left: Box<[u16]>,
+    capacity: Box<[u16]>,
     pub greedy_result: Statistics,
     pub random_result: Statistics,
 }
@@ -72,8 +71,7 @@ impl Knapsack {
                 _ => {
                     // a line with rhs of <= constraints
                     debug_assert_eq!(contents.len(), knapsack.m);
-                    knapsack.total_capacity = contents.clone().into_boxed_slice();
-                    knapsack.capacity_left = contents.into_boxed_slice();
+                    knapsack.capacity = contents.into_boxed_slice();
                 }
             }
         }
@@ -99,6 +97,8 @@ impl Knapsack {
     }
 
     pub fn run_greedy(&mut self) {
+        let mut capacity_left = self.capacity.clone();
+
         let time = Instant::now();
 
         self.items.sort_unstable_by(|a, b| b.cmp(a));
@@ -106,7 +106,7 @@ impl Knapsack {
         let mut item_can_be_used = false;
 
         for item in &self.items {
-            for (index, constraint) in self.capacity_left.iter().enumerate() {
+            for (index, constraint) in capacity_left.iter().enumerate() {
                 if item.weights[index] > *constraint {
                     item_can_be_used = false;
                     break;
@@ -116,7 +116,7 @@ impl Knapsack {
             }
 
             if item_can_be_used {
-                for (index, constraint) in self.capacity_left.iter_mut().enumerate() {
+                for (index, constraint) in capacity_left.iter_mut().enumerate() {
                     *constraint -= item.weights[index];
                 }
 
@@ -128,7 +128,7 @@ impl Knapsack {
         self.greedy_result.duration = time.elapsed();
         self.greedy_result.runs = 1;
 
-        for (left, total) in self.capacity_left.iter().zip(self.total_capacity.iter()) {
+        for (left, total) in capacity_left.iter().zip(self.capacity.iter()) {
             self.greedy_result.utilization.push(format!(
                 "{:.2}%",
                 ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
@@ -139,7 +139,7 @@ impl Knapsack {
     pub fn run_random(&mut self, runs: usize) {
         let mut knapsacks = Vec::new();
 
-        self.capacity_left = self.total_capacity.clone();
+        let time = Instant::now();
 
         for _ in 0..runs {
             let mut k = self.clone();
@@ -149,13 +149,13 @@ impl Knapsack {
 
         debug_assert_eq!(knapsacks.len(), runs);
 
-        let time = Instant::now();
-
         knapsacks.par_iter_mut().for_each(|knapsack| {
+            let mut capacity_left = self.capacity.clone();
+
             let mut item_can_be_used = false;
 
             for item in &knapsack.items {
-                for (index, constraint) in knapsack.capacity_left.iter().enumerate() {
+                for (index, constraint) in capacity_left.iter().enumerate() {
                     if item.weights[index] > *constraint {
                         item_can_be_used = false;
                         break;
@@ -165,7 +165,7 @@ impl Knapsack {
                 }
 
                 if item_can_be_used {
-                    for (index, constraint) in knapsack.capacity_left.iter_mut().enumerate() {
+                    for (index, constraint) in capacity_left.iter_mut().enumerate() {
                         *constraint -= item.weights[index];
                     }
 
@@ -176,6 +176,8 @@ impl Knapsack {
                     knapsack.random_result.total_profit += u32::from(item.profit);
                 }
             }
+
+            knapsack.capacity = capacity_left;
         });
 
         let mut best_profid_index = 0;
@@ -192,9 +194,11 @@ impl Knapsack {
         self.random_result.duration = time.elapsed();
         self.random_result.runs = runs;
 
-        self.capacity_left = knapsacks[best_profid_index].capacity_left.clone();
-
-        for (left, total) in self.capacity_left.iter().zip(self.total_capacity.iter()) {
+        for (left, total) in knapsacks[best_profid_index]
+            .capacity
+            .iter()
+            .zip(self.capacity.iter())
+        {
             self.random_result.utilization.push(format!(
                 "{:.2}%",
                 ((f32::from(*total - *left) / f32::from(*total)) * 100_f32)
