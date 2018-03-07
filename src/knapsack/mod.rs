@@ -122,7 +122,7 @@ impl Knapsack {
                 }
 
                 result.picked_items.push(item.id.to_string());
-                result.total_profit += u32::from(item.profit);
+                result.total_profit += item.profit;
             }
         }
 
@@ -175,7 +175,7 @@ impl Knapsack {
                     internal_result
                         .picked_items
                         .push(self.items[*index].id.to_string());
-                    internal_result.total_profit += u32::from(self.items[*index].profit);
+                    internal_result.total_profit += self.items[*index].profit;
                 }
             }
 
